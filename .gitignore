@@ -5,6 +5,9 @@ __pycache__/
 *.egg-info/
 .venv/
 venv/
+build/
+dist/
+*.spec
 
 # IDE and editor state
 .idea/

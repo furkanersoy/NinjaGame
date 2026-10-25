@@ -53,6 +53,9 @@ class Game:
             except (TypeError, ValueError):
                 pass
         self.paused = False
+        self.main_menu = True
+        self.menu_selection = 0
+        self.settings_from_menu = False
         self.pause_selection = 0
         self.awaiting_binding = False
         self.completed = False
@@ -141,9 +144,43 @@ class Game:
         for name, sound in self.sfx.items():
             sound.set_volume(min(1.0, base_volumes[name] * self.sfx_volume))
 
+    def _draw_menu(self, title, subtitle, options, selection):
+        """Draw a compact, scalable menu over the game's illustrated backdrop."""
+        self.display_2.blit(self.assets['background'], (0, 0))
+        shade = pygame.Surface(self.display_2.get_size(), pygame.SRCALPHA)
+        shade.fill((7, 12, 27, 205))
+        self.display_2.blit(shade, (0, 0))
+        dense = len(options) > 5
+        panel = pygame.Rect(40, 8, 240, 224)
+        pygame.draw.rect(self.display_2, (13, 24, 42), panel, border_radius=10)
+        pygame.draw.rect(self.display_2, (89, 177, 185), panel, width=2, border_radius=10)
+        title_font = pygame.font.Font(None, 42)
+        subtitle_font = pygame.font.Font(None, 18)
+        title_image = title_font.render(title, True, (244, 247, 239))
+        self.display_2.blit(title_image, title_image.get_rect(center=(160, 27 if dense else 34)))
+        sub_image = subtitle_font.render(subtitle, True, (148, 204, 201))
+        self.display_2.blit(sub_image, sub_image.get_rect(center=(160, 45 if dense else 53)))
+        font = pygame.font.Font(None, 21 if dense else 25)
+        for index, label in enumerate(options):
+            row = pygame.Rect(58, (59 if dense else 68) + index * (19 if dense else 29), 204, 18 if dense else 25)
+            active = index == selection
+            if active:
+                pygame.draw.rect(self.display_2, (36, 92, 102), row, border_radius=6)
+                pygame.draw.rect(self.display_2, (129, 220, 195), row, width=1, border_radius=6)
+            text = font.render(label, True, (255, 224, 135) if active else (222, 230, 235))
+            self.display_2.blit(text, text.get_rect(center=row.center))
+        hint_text = 'Yeni tuşa basın (Esc iptal)' if self.awaiting_binding else 'Yukarı/aşağı seç   Enter onayla   Esc geri'
+        hint = pygame.font.Font(None, 16).render(hint_text, True, (161, 174, 190))
+        self.display_2.blit(hint, hint.get_rect(center=(160, 222 if dense else 202)))
+
     def load_level(self, level_index):
         self.tilemap.load(self.map_paths[level_index])
         self.player.climb_energy = self.player.max_climb_energy
+        self.player.jumps = 2
+        self.player.air_time = 0
+        self.player.dash_cooldown = 0
+        self.player.health = self.player.max_health
+        self.player.invulnerable_frames = 0
         self.player.wall_slide = False
         self.player.velocity = [0, 0]
         self.player.dashing = 0
@@ -181,6 +218,33 @@ class Game:
                     pygame.quit()
                     sys.exit()
                 if event.type == pygame.KEYDOWN:
+                    if self.main_menu:
+                        if event.key in (pygame.K_UP, pygame.K_w):
+                            self.menu_selection = (self.menu_selection - 1) % 4
+                        elif event.key in (pygame.K_DOWN, pygame.K_s):
+                            self.menu_selection = (self.menu_selection + 1) % 4
+                        elif event.key == pygame.K_ESCAPE:
+                            pygame.quit()
+                            sys.exit()
+                        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                            if self.menu_selection == 0:
+                                self.main_menu = False
+                            elif self.menu_selection == 1:
+                                self.level_index = 0
+                                self.completed = False
+                                self.save_data['completed'] = False
+                                self._write_save()
+                                self.load_level(0)
+                                self.main_menu = False
+                            elif self.menu_selection == 2:
+                                self.main_menu = False
+                                self.paused = True
+                                self.pause_selection = 0
+                                self.settings_from_menu = True
+                            else:
+                                pygame.quit()
+                                sys.exit()
+                        continue
                     if self.awaiting_binding:
                         if event.key != pygame.K_ESCAPE:
                             control_name = ('left', 'right', 'jump', 'dash')[self.pause_selection - 1]
@@ -195,7 +259,12 @@ class Game:
                         self._write_save()
                         self.load_level(self.level_index)
                     elif event.key == pygame.K_ESCAPE and not self.completed:
-                        self.paused = not self.paused
+                        if self.paused and self.settings_from_menu:
+                            self.paused = False
+                            self.main_menu = True
+                            self.settings_from_menu = False
+                        else:
+                            self.paused = not self.paused
                         if self.paused:
                             self.movement = [False, False]
                             self.climb = False
@@ -215,11 +284,21 @@ class Game:
                         elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
                             if self.pause_selection == 0:
                                 self.paused = False
+                                if self.settings_from_menu:
+                                    self.main_menu = True
+                                    self.menu_selection = 2
+                                    self.settings_from_menu = False
                             elif 1 <= self.pause_selection <= 4:
                                 self.awaiting_binding = True
                             elif self.pause_selection == 7:
-                                pygame.quit()
-                                sys.exit()
+                                if self.settings_from_menu:
+                                    self.paused = False
+                                    self.main_menu = True
+                                    self.settings_from_menu = False
+                                    self.menu_selection = 2
+                                else:
+                                    pygame.quit()
+                                    sys.exit()
                     elif not self.completed:
                         if event.key == self.controls['left']:
                             self.movement[0] = True
@@ -239,36 +318,38 @@ class Game:
                     elif event.key == self.controls['jump']:
                         self.climb = False
 
+            if self.main_menu:
+                self._draw_menu(
+                    'NINJA GAME',
+                    f'{len(self.map_paths)} BÖLÜMLÜ MACERA',
+                    ['Devam Et', 'Yeni Oyun', 'Ayarlar / Kontroller', 'Oyundan Çık'],
+                    self.menu_selection,
+                )
+                self.screen.blit(pygame.transform.scale(self.display_2, self.screen.get_size()), (0, 0))
+                pygame.display.update()
+                self.clock.tick(60)
+                continue
+
             if self.paused or self.completed:
-                self.display_2.blit(self.assets['background'], (0, 0))
-                overlay = pygame.Surface(self.display_2.get_size(), pygame.SRCALPHA)
-                overlay.fill((0, 0, 0, 190))
-                self.display_2.blit(overlay, (0, 0))
-                title = 'Bölüm Tamamlandı!' if self.completed else 'Duraklatıldı'
-                title_image = pygame.font.Font(None, 36).render(title, True, (255, 255, 255))
-                self.display_2.blit(title_image, title_image.get_rect(center=(160, 27)))
                 if self.completed:
-                    hint = pygame.font.Font(None, 22).render('Yeniden başlamak için Enter', True, (220, 220, 220))
-                    self.display_2.blit(hint, hint.get_rect(center=(160, 110)))
+                    self._draw_menu('Bölüm tamamlandı!', 'Macera sona erdi', ['Enter ile yeniden başla'], 0)
                 else:
                     options = [
-                        'Devam Et',
+                        'Menüye dön' if self.settings_from_menu else 'Devam Et',
                         f'Sola git: {pygame.key.name(self.controls["left"])}',
                         f'Sağa git: {pygame.key.name(self.controls["right"])}',
-                        f'Zıpla/tırman: {pygame.key.name(self.controls["jump"])}',
+                        f'Zıpla x2/tırman: {pygame.key.name(self.controls["jump"])}',
                         f'Atıl: {pygame.key.name(self.controls["dash"])}',
                         f'Müzik: {int(self.music_volume * 100)}%',
                         f'Ses efektleri: {int(self.sfx_volume * 100)}%',
-                        'Oyundan çık',
+                        'Ana menüye dön' if self.settings_from_menu else 'Oyundan çık',
                     ]
-                    font = pygame.font.Font(None, 26)
-                    for index, label in enumerate(options):
-                        color = (255, 220, 90) if index == self.pause_selection else (230, 230, 230)
-                        image = font.render(label, True, color)
-                        self.display_2.blit(image, image.get_rect(center=(160, 58 + index * 21)))
-                    help_text = 'Yeni tuşa basın (Esc iptal)' if self.awaiting_binding else 'Enter: seç | ←/→: ses düzeyi'
-                    hint = pygame.font.Font(None, 18).render(help_text, True, (180, 180, 180))
-                    self.display_2.blit(hint, hint.get_rect(center=(160, 235)))
+                    self._draw_menu(
+                        'Ayarlar' if self.settings_from_menu else 'Duraklatıldı',
+                        'Yeni tuşa basın (Esc iptal)' if self.awaiting_binding else 'Yukarı/aşağı: seç   Sol/sağ: ses',
+                        options,
+                        self.pause_selection,
+                    )
                 self.screen.blit(pygame.transform.scale(self.display_2, self.screen.get_size()), (0, 0))
                 pygame.display.update()
                 self.clock.tick(60)
@@ -335,17 +416,21 @@ class Game:
                         self.sparks.append(Spark(projectile[0], random.random() - 0.5 + (math.pi if projectile[1] > 0 else 0), 2 + random.random()))
                 elif projectile[2] > 360:
                     self.projectiles.remove(projectile)
-                elif abs(self.player.dashing) < 50:
+                elif abs(self.player.dashing) < 50 and not self.dead:
                     if self.player.rect().collidepoint(projectile[0]):
                         self.projectiles.remove(projectile)
-                        self.dead += 1
-                        self.sfx['hit'].play()
-                        self.screenshake = max(16, self.screenshake)
-                        for i in range(30):
-                            angle = random.random() * math.pi * 2
-                            speed = random.random() * 5
-                            self.sparks.append(Spark(self.player.rect().center, angle, 2 + random.random()))
-                            self.particles.append(Particle(self, 'particle', self.player.rect().center, velocity=[math.cos(angle + math.pi) * speed * 0.5, math.sin(angle + math.pi) * speed * 0.5], frame=random.randint(0, 7)))
+                        if not self.player.invulnerable_frames:
+                            self.player.health -= 1
+                            self.player.invulnerable_frames = 90
+                            self.sfx['hit'].play()
+                            self.screenshake = max(12, self.screenshake)
+                            for i in range(18):
+                                angle = random.random() * math.pi * 2
+                                speed = random.random() * 4
+                                self.sparks.append(Spark(self.player.rect().center, angle, 2 + random.random()))
+                                self.particles.append(Particle(self, 'particle', self.player.rect().center, velocity=[math.cos(angle + math.pi) * speed * 0.5, math.sin(angle + math.pi) * speed * 0.5], frame=random.randint(0, 7)))
+                            if self.player.health <= 0:
+                                self.dead = 1
                         
             for spark in self.sparks.copy():
                 kill = spark.update()
@@ -374,10 +459,33 @@ class Game:
                 
             self.display_2.blit(self.display, (0, 0))
 
-            if self.player.climb_energy < self.player.max_climb_energy:
-                pygame.draw.rect(self.display_2, (25, 25, 25), (8, 8, 74, 9))
-                energy_width = round(70 * self.player.climb_energy / self.player.max_climb_energy)
-                pygame.draw.rect(self.display_2, (70, 210, 125), (10, 10, energy_width, 5))
+            hud = pygame.Surface((100, 46), pygame.SRCALPHA)
+            hud.fill((9, 19, 31, 190))
+            self.display_2.blit(hud, (5, 5))
+            tiny_font = pygame.font.Font(None, 13)
+            self.display_2.blit(tiny_font.render('TIRMANIŞ', True, (190, 218, 216)), (9, 7))
+            pygame.draw.rect(self.display_2, (28, 39, 49), (9, 17, 90, 6), border_radius=3)
+            energy_width = round(88 * self.player.climb_energy / self.player.max_climb_energy)
+            if energy_width:
+                pygame.draw.rect(self.display_2, (73, 211, 147), (10, 18, energy_width, 4), border_radius=2)
+            self.display_2.blit(tiny_font.render('ATILMA', True, (190, 218, 216)), (9, 26))
+            pygame.draw.rect(self.display_2, (28, 39, 49), (48, 29, 51, 6), border_radius=3)
+            dash_ready = 1 - self.player.dash_cooldown / 75
+            pygame.draw.rect(self.display_2, (244, 179, 79) if self.player.dash_cooldown else (73, 211, 147), (49, 30, round(49 * dash_ready), 4), border_radius=2)
+            for jump_index in range(2):
+                color = (255, 224, 135) if jump_index < self.player.jumps else (66, 76, 88)
+                pygame.draw.circle(self.display_2, color, (12 + jump_index * 9, 42), 3)
+            stage = 'ÖZEL HARİTA' if self.custom_map else f'BÖLÜM {self.level_index + 1}/{len(self.map_paths)}'
+            stage_image = pygame.font.Font(None, 19).render(stage, True, (240, 244, 232))
+            self.display_2.blit(stage_image, stage_image.get_rect(topright=(311, 8)))
+            enemy_text = pygame.font.Font(None, 17).render(f'Düşman: {len(self.enemies)}', True, (230, 196, 145))
+            self.display_2.blit(enemy_text, enemy_text.get_rect(topright=(311, 25)))
+            for heart_index in range(self.player.max_health):
+                heart_color = (226, 87, 97) if heart_index < self.player.health else (66, 76, 88)
+                heart_x = 281 + heart_index * 12
+                pygame.draw.circle(self.display_2, heart_color, (heart_x + 3, 44), 3)
+                pygame.draw.circle(self.display_2, heart_color, (heart_x + 7, 44), 3)
+                pygame.draw.polygon(self.display_2, heart_color, [(heart_x, 45), (heart_x + 10, 45), (heart_x + 5, 51)])
             
             screenshake_offset = (random.random() * self.screenshake - self.screenshake / 2, random.random() * self.screenshake - self.screenshake / 2)
             self.screen.blit(pygame.transform.scale(self.display_2, self.screen.get_size()), screenshake_offset)

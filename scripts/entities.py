@@ -140,11 +140,15 @@ class Player(PhysicsEntity):
     def __init__(self, game, pos, size):
         super().__init__(game, 'player', pos, size)
         self.air_time = 0
-        self.jumps = 1
+        self.jumps = 2
         self.wall_slide = False
         self.dashing = 0
         self.max_climb_energy = 180
         self.climb_energy = self.max_climb_energy
+        self.dash_cooldown = 0
+        self.max_health = 3
+        self.health = self.max_health
+        self.invulnerable_frames = 0
     
     def update(self, tilemap, movement=(0, 0)):
         climbing = self.wall_slide and self.game.climb and self.climb_energy > 0
@@ -162,10 +166,15 @@ class Player(PhysicsEntity):
             if not self.game.dead:
                 self.game.screenshake = max(16, self.game.screenshake)
             self.game.dead += 1
+
+        if self.dash_cooldown > 0:
+            self.dash_cooldown -= 1
+        if self.invulnerable_frames > 0:
+            self.invulnerable_frames -= 1
         
         if self.collisions['down']:
             self.air_time = 0
-            self.jumps = 1
+            self.jumps = 2
             self.climb_energy = min(self.max_climb_energy, self.climb_energy + 3)
         elif not self.wall_slide:
             self.climb_energy = min(self.max_climb_energy, self.climb_energy + 0.5)
@@ -211,7 +220,7 @@ class Player(PhysicsEntity):
             self.velocity[0] = min(self.velocity[0] + 0.1, 0)
     
     def render(self, surf, offset=(0, 0)):
-        if abs(self.dashing) <= 50:
+        if abs(self.dashing) <= 50 and (self.invulnerable_frames == 0 or self.invulnerable_frames // 6 % 2 == 0):
             super().render(surf, offset=offset)
             
     def jump(self):
@@ -236,8 +245,9 @@ class Player(PhysicsEntity):
             return True
     
     def dash(self):
-        if not self.dashing:
+        if not self.dashing and not self.dash_cooldown:
             self.game.sfx['dash'].play()
+            self.dash_cooldown = 75
             if self.flip:
                 self.dashing = -60
             else:

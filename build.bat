@@ -6,4 +6,9 @@ if errorlevel 1 (
     echo Build failed. Check that requirements.txt has been installed.
     exit /b 1
 )
+copy /Y README.md dist\NinjaGame\README.txt >nul
+if errorlevel 1 (
+    echo Build completed, but the player guide could not be copied.
+    exit /b 1
+)
 echo Build complete: dist\NinjaGame\NinjaGame.exe

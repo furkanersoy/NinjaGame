@@ -1,72 +1,56 @@
 # Ninja Game
 
-Pygame ile geliştirilmiş, bölüm tabanlı bir 2D platform oyunu. Projede oyunun yanında özel bir harita editörü de bulunur.
+Pygame ile geliştirilmiş, altı bölümlük 2D ninja platform oyunu. Uzun keşif rotaları, düşman çatışmaları, duvara tırmanma, çift zıplama ve atılma hareketleri içerir. Harita editörü de projeye dahildir.
 
-## Gereksinimler
+## Oyunu çalıştırma
 
-- Python 3.10 veya üzeri
-- Pygame (requirements.txt içinden kurulur)
-
-## Kurulum
-
-Proje klasöründe sanal ortam oluşturup bağımlılıkları yükleyin:
-
-```bash
-python -m venv .venv
-```
-
-Windows:
+Python 3.10 veya üzerini kurduktan sonra proje klasöründe:
 
 ```powershell
+python -m venv .venv
 .venv\Scripts\Activate.ps1
-```
-
-macOS/Linux:
-
-```bash
-source .venv/bin/activate
-```
-
-Ardından:
-
-```bash
 python -m pip install -r requirements.txt
-```
-
-## Oyunu başlatma
-
-Proje kök dizininden:
-
-```bash
 python game.py
 ```
 
-Varsayılan kontroller sol/sağ ok ile hareket, yukarı ok ile zıplama ve duvara tutunurken tırmanma, X ile atılmadır. Tırmanış enerjisi yerde yenilenir. Esc ile oyunu duraklatıp kontrolleri yeniden atayabilir ve müzik/ses efekt düzeylerini değiştirebilirsiniz.
+Linux veya macOS'ta sanal ortamı `source .venv/bin/activate` ile etkinleştirin.
 
-İlerleme ve ses tercihleri kullanıcı profilindeki `.ninjagame/save.json` dosyasına kaydedilir.
+## Kontroller
+
+| İşlem | Varsayılan tuş |
+| --- | --- |
+| Hareket | Sol / Sağ ok |
+| Zıpla ve duvara tırman | Yukarı ok |
+| Atılma | X |
+| Duraklat / geri | Esc |
+| Menüde gezin / seç | Yukarı-aşağı ok, Enter |
+
+Oyuncu ikinci bir kez zıplayabilir ve üç cana sahiptir. Hasar aldıktan sonra kısa süreliğine yeniden hasar görmez. Atılma kullanımdan sonra kısa bir dolum süresi bekler; ekrandaki göstergeler canı, tırmanış enerjisini, atılmayı ve kullanılabilir zıplamaları gösterir. Kontroller ve müzik/ses seviyesi Ayarlar menüsünden değiştirilebilir.
+
+İlerleme ve tercihler Windows'ta `%USERPROFILE%\.ninjagame\save.json` konumuna kaydedilir.
 
 ## Harita editörü
 
-```bash
+```powershell
 python editor/editor.py
 ```
 
-WASD ile görünümü kaydırın. G ile ızgaralı/serbest yerleştirme arasında geçiş yapın, T ile otomatik döşeme uygulayın ve O ile haritayı `editor/world.json` konumuna kaydedin. Ctrl+Z ve Ctrl+Y geri al/yinele işlemleridir. Ekranın altındaki durum metni kaydedilmemiş değişiklikleri gösterir. Shift ile fare tekerleği varyant seçer; Shift olmadan tekerlek döşeme grubunu değiştirir.
+WASD ile görünümü kaydırın. G ızgaralı/serbest yerleşimi değiştirir, T otomatik döşemeyi uygular. O haritayı `editor/world.json` konumuna kaydeder; Ctrl+Z ve Ctrl+Y geri al/yinele işlemleridir.
 
-Son düzenlediğiniz haritayı oyunda önizlemek için proje kökünden çalıştırın:
+Haritayı oyunda denemek için:
 
-```bash
+```powershell
 python game.py --map editor/world.json
 ```
 
-## Windows uygulaması oluşturma
+## Windows için dağıtım
 
-Bağımlılıkları kurduktan sonra proje kökünde `build.bat` dosyasını çalıştırın. Uygulama `dist/NinjaGame/` klasörüne oluşturulur; klasörün tamamını birlikte taşıyın.
+`build.bat` dosyasını çalıştırın. PyInstaller, çalıştırılabilir dosyayı ve oyun varlıklarını `dist/NinjaGame/` klasöründe hazırlar. Bu klasörün tamamını oyuncularla paylaşın; oyun `NinjaGame.exe` üzerinden başlatılır.
 
 ## Proje yapısı
 
-- `game.py`: oyun döngüsü ve seviye akışı
-- `scripts/`: varlıklar, karakterler, fizik ve harita işleme
-- `data/maps/`: oyun seviyeleri (numaralı JSON dosyaları)
-- `data/images/`, `data/sfx/`, `data/music.wav`: oyun varlıkları
-- `editor/`: harita editörü ve düzenlenen harita
+- `game.py`: ana menü, oyun döngüsü, kayıt ve seviye akışı
+- `scripts/`: oyuncu, düşman, fizik, animasyon ve harita kodu
+- `data/maps/`: altı numaralı bölüm haritası
+- `data/images/`, `data/sfx/`, `data/music.wav`: oyun görselleri ve sesleri
+- `editor/`: harita düzenleyici
